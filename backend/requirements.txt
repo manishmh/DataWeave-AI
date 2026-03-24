@@ -1,0 +1,37 @@
+# ETL
+pdfplumber>=0.10.3
+camelot-py[cv]>=0.11.0
+opencv-python-headless>=4.8.0
+ghostscript>=0.7
+
+# Data
+pandas>=2.1.0
+numpy>=1.26.0
+
+# Torch CPU-only (must be installed BEFORE sentence-transformers to prevent
+# pip from pulling the 900MB CUDA wheel)
+# Install separately via: pip install torch --index-url https://download.pytorch.org/whl/cpu
+# torch is listed here only so it appears in the lockfile; the separate
+# install command below handles the correct index URL.
+
+# Indexing
+sentence-transformers>=2.7.0
+chromadb>=0.5.0
+tiktoken>=0.7.0
+
+# Agent / LLM
+langchain>=0.2.0
+langchain-openai>=0.1.0
+langchain-community>=0.2.0
+openai>=1.30.0
+
+# API
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.7.0
+
+# Logging
+structlog>=24.1.0
+
+# Utilities
+python-dotenv>=1.0.0
