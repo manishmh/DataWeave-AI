@@ -134,7 +134,7 @@ export default function UploadPage() {
       console.error(err);
       setError(
         err?.response?.data?.detail ||
-          'Failed to process the document. Is the backend running on :8000?'
+          'Failed to process the document. Please check that the backend is reachable and try again.'
       );
       setPhase('select');
       setProgress(0);
