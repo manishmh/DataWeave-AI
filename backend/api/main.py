@@ -146,40 +146,76 @@ class PDFMeta(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Auth — verify the Supabase access token (HS256, signed with the project's
-# JWT secret). The frontend sends it as `Authorization: Bearer <token>`.
-#
-# Set SUPABASE_JWT_SECRET (Supabase → Settings → API → JWT Secret) to ENFORCE
-# auth. If it's unset, verification is skipped (fail-open) so the service still
-# boots before the secret is configured — a warning is logged in that case.
+# Auth — verify the Supabase access token. The frontend sends it as
+# `Authorization: Bearer <token>`. Supabase signs user tokens either:
+#   * ES256/RS256 (newer, asymmetric)  → verified via the project JWKS
+#   * HS256 (legacy, shared secret)    → verified with SUPABASE_JWT_SECRET
+# We support both. Configure ONE of:
+#   SUPABASE_URL          (e.g. https://<ref>.supabase.co) → enables JWKS
+#   SUPABASE_JWT_SECRET   (Settings → API → JWT Secret)    → enables HS256
+# If NEITHER is set, verification is skipped (fail-open) so the service still
+# boots before configuration — a warning is logged in that case.
 # ---------------------------------------------------------------------------
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 _bearer = HTTPBearer(auto_error=False)
+_jwks_client: "jwt.PyJWKClient | None" = None
 
-if not SUPABASE_JWT_SECRET:
+if not SUPABASE_JWT_SECRET and not SUPABASE_URL:
     logger.warning(
-        "SUPABASE_JWT_SECRET is not set — backend routes are UNAUTHENTICATED. "
-        "Set it to require a valid login on /query, /upload, etc."
+        "Neither SUPABASE_URL nor SUPABASE_JWT_SECRET is set — backend routes are "
+        "UNAUTHENTICATED. Set SUPABASE_URL to require a valid login on /query, /upload, etc."
     )
+
+
+def _get_jwks_client() -> "jwt.PyJWKClient | None":
+    global _jwks_client
+    if _jwks_client is None and SUPABASE_URL:
+        # PyJWKClient caches keys in-process after the first fetch.
+        _jwks_client = jwt.PyJWKClient(f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json")
+    return _jwks_client
 
 
 def require_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict | None:
     """FastAPI dependency: 401 unless a valid Supabase JWT is presented."""
-    if not SUPABASE_JWT_SECRET:
-        return None  # enforcement disabled until the secret is configured
+    if not SUPABASE_JWT_SECRET and not SUPABASE_URL:
+        return None  # enforcement disabled until configured
     if creds is None:
         raise HTTPException(status_code=401, detail="Missing authentication token.")
+
+    token = creds.credentials
+    issuer = f"{SUPABASE_URL}/auth/v1" if SUPABASE_URL else None
     try:
+        alg = jwt.get_unverified_header(token).get("alg", "")
+
+        if alg == "HS256":
+            if not SUPABASE_JWT_SECRET:
+                raise HTTPException(status_code=401, detail="HS256 token but SUPABASE_JWT_SECRET not set.")
+            return jwt.decode(
+                token, SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated"
+            )
+
+        # Asymmetric (ES256/RS256) → verify with the project's public JWKS.
+        client = _get_jwks_client()
+        if client is None:
+            raise HTTPException(status_code=401, detail="Asymmetric token but SUPABASE_URL not set.")
+        signing_key = client.get_signing_key_from_jwt(token)
         return jwt.decode(
-            creds.credentials,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
+            token,
+            signing_key.key,
+            algorithms=["ES256", "RS256"],
             audience="authenticated",
+            issuer=issuer,
         )
+    except HTTPException:
+        raise
     except jwt.PyJWTError as exc:
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {exc}")
+    except Exception as exc:  # JWKS fetch / key errors
+        logger.warning("JWT verification error: %s", exc)
+        raise HTTPException(status_code=401, detail="Token verification failed.")
 
 
 # ---------------------------------------------------------------------------
