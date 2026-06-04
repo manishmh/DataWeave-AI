@@ -5,6 +5,10 @@ Nexus_Data_Project_Report.pdf
 .idea/
 .codex
 
+# HF Space deploy mirror — separate git repo, pushed to Hugging Face directly.
+# The canonical backend lives in backend/; do not commit this duplicate.
+hf-space/
+
 # Secrets / credential dumps — never commit
 *api_key*.txt
 *secret*
@@ -67,5 +71,3 @@ backend/.vscode/
 backend/.idea/
 backend/*.swp
 backend/*.swo
-
-hf-space

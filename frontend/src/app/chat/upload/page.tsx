@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Loader2,
   X,
+  Info,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 
@@ -143,11 +144,35 @@ export default function UploadPage() {
 
   return (
     <div style={{ maxWidth: '760px', margin: '0 auto' }}>
-      <div className="page-header" style={{ textAlign: 'center', marginBottom: '40px' }}>
+      <div className="page-header" style={{ textAlign: 'center', marginBottom: '24px' }}>
         <h1 className="page-title">New Document</h1>
         <p className="page-subtitle">
           Upload a PDF to extract, index, and start chatting with it.
         </p>
+      </div>
+
+      {/* Upload limits / capacity notice */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '12px',
+          alignItems: 'flex-start',
+          padding: '14px 18px',
+          marginBottom: '24px',
+          borderRadius: '14px',
+          background: 'rgba(6, 182, 212, 0.08)',
+          border: '1px solid rgba(6, 182, 212, 0.25)',
+          fontSize: '0.88rem',
+          lineHeight: 1.5,
+          color: 'var(--text-secondary)',
+        }}
+      >
+        <Info size={18} style={{ color: 'var(--accent-secondary)', flexShrink: 0, marginTop: '1px' }} />
+        <span>
+          <strong style={{ color: 'var(--text-primary)' }}>Up to 50&nbsp;MB per PDF.</strong>{' '}
+          Total storage is capped at roughly <strong style={{ color: 'var(--text-primary)' }}>1&nbsp;GB</strong> across all
+          documents (free tier). When that fills up, the oldest documents are automatically removed to make room for new uploads.
+        </span>
       </div>
 
       <div className="glass-panel" style={{ padding: '40px' }}>

@@ -628,7 +628,9 @@ a {
   width: 100%;
   padding: 8px 8px 8px 18px;
   border-radius: 26px;
-  background: rgba(255, 255, 255, 0.04);
+  /* Match the sidebar surface so the input reads as part of the app shell. */
+  background: rgba(10, 10, 18, 0.6);
+  backdrop-filter: blur(20px);
   border: 1px solid var(--panel-border);
   transition: border-color 0.2s ease;
 }
@@ -683,21 +685,179 @@ a {
 }
 
 /* ---------- Backend status ---------- */
-.backend-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+/* Sidebar storage usage meter */
+.storage-meter {
+  padding: 0 4px;
+  margin-bottom: 14px;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.storage-meter-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
 }
+
+.storage-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.storage-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease, background 0.3s ease;
+}
+
+/* ---------------- Auth pages (login / register / guest) --------------- */
+.auth-shell {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 400px;
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: 24px;
+}
+
+.auth-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.auth-sub {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 22px;
+}
+
+.auth-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+.auth-input:focus { border-color: rgba(139, 92, 246, 0.5); }
+
+.auth-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.auth-foot {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 14px;
+}
+
+.auth-link { color: var(--accent-secondary); font-weight: 600; }
+.auth-link:hover { text-decoration: underline; }
+
+.auth-error {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+.auth-notice {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #6ee7b7;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+/* Sidebar account row */
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.account-email {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+.account-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent-secondary);
+  background: rgba(6, 182, 212, 0.12);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+.account-signout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.account-signout:hover { color: var(--danger-color); background: rgba(239, 68, 68, 0.1); }
 
 /* Scrollbar */
 ::-webkit-scrollbar {

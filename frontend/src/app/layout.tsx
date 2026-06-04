@@ -1,5 +1,6 @@
 import '@/styles/globals.css';
 import type { Metadata } from 'next';
+import { AuthProvider } from '@/context/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'Nexus Data | Agentic PDF Search',
@@ -14,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

@@ -157,12 +157,15 @@ export default function ChatPage() {
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '8px 4px',
+          padding: '24px',
           marginBottom: '16px',
           display: 'flex',
           flexDirection: 'column',
           gap: '24px',
           minHeight: 0,
+          background: 'rgba(40, 44, 52, 0.6)',
+          border: '1px solid var(--panel-border)',
+          borderRadius: '18px',
         }}
       >
         {messages.length === 0 ? (
