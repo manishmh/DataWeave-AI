@@ -3,6 +3,16 @@ Nexus_Data_Project_Report.pdf
 .DS_Store
 .vscode/
 .idea/
+.codex
+
+# Secrets / credential dumps — never commit
+*api_key*.txt
+*secret*
+*.pem
+
+# Python bytecode (anywhere in the tree)
+**/__pycache__/
+*.py[cod]
 
 # Frontend (Next.js / Node)
 frontend/node_modules/
@@ -15,12 +25,15 @@ frontend/.env.local
 frontend/.env.development.local
 frontend/.env.test.local
 frontend/.env.production.local
+!frontend/.env.example
 frontend/*.log
 
 # Backend (Python)
 backend/.env
 backend/.env.*
 backend/.env.local
+# …but keep the committed template
+!backend/.env.example
 
 backend/__pycache__/
 backend/*.py[cod]
@@ -37,11 +50,16 @@ backend/venv/
 backend/env/
 
 backend/data/chroma_db/
+backend/data/qdrant_local/
 backend/data/chunks.json
 backend/data/tables/
 backend/data/*.pdf
 backend/data/*.csv
 backend/data/*.xlsx
+
+# Local model / HF caches (downloaded at runtime, never committed)
+backend/.cache/
+backend/models/
 
 backend/logs/
 

@@ -43,8 +43,8 @@ export default function LibraryPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="spinner" />
+      <div className="center-full">
+        <Loader2 size={32} className="icon-spin" style={{ color: 'var(--accent-color)' }} />
       </div>
     );
   }
@@ -69,7 +69,7 @@ export default function LibraryPage() {
           <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
             Upload a PDF document to start querying its contents using agentic AI.
           </p>
-          <Link href="/upload" className="glass-button primary">
+          <Link href="/chat/upload" className="glass-button primary">
             <ArrowRight size={18} />
             Upload Document
           </Link>

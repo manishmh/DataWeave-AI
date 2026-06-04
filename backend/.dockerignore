@@ -1,0 +1,26 @@
+# Secrets — never bake into the image (set as platform env vars instead)
+.env
+.env.*
+!.env.example
+
+# Python caches / build artifacts
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Runtime data & index — recreated at runtime / lives in Qdrant Cloud
+data/
+logs/
+
+# Editor / OS cruft
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Docs not needed at runtime
+README.md

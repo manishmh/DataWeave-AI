@@ -16,8 +16,13 @@ numpy>=1.26.0
 
 # Indexing
 sentence-transformers>=2.7.0
-chromadb>=0.5.0
+# Hosted vector DB (Qdrant Cloud) — keeps the index outside the backend's
+# ephemeral filesystem so the API stays stateless. See .env.example.
+qdrant-client>=1.12.0
 tiktoken>=0.7.0
+# scipy is a transitive dep of scikit-learn (pulled in by sentence-transformers);
+# pin it explicitly so a partial install doesn't break with ModuleNotFoundError.
+scipy>=1.11.0
 
 # Agent / LLM
 langchain>=0.2.0

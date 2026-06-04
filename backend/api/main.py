@@ -57,16 +57,25 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# CORS – allow Next.js dev server and any localhost origin
+# CORS – local dev origins plus any deployed frontend origins.
+# Set ALLOWED_ORIGINS (comma-separated) in the backend env to your Vercel URL,
+# e.g. ALLOWED_ORIGINS="https://my-app.vercel.app". Use "*" to allow all.
 # ---------------------------------------------------------------------------
+import os
+
+_DEV_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+]
+_env_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+_allow_all = "*" in _env_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"] if _allow_all else _DEV_ORIGINS + _env_origins,
+    # Credentials cannot be combined with a "*" origin per the CORS spec.
+    allow_credentials=not _allow_all,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -147,6 +156,33 @@ def list_pdfs():
     return _load_pdfs_meta()
 
 
+@app.get("/storage", tags=["System"])
+def storage_status():
+    """Current Qdrant memory usage vs the free-tier limit (per-PDF breakdown)."""
+    from indexing.storage_guard import memory_report
+    from indexing.vector_store import VectorStore
+
+    report = memory_report()
+    pdfs = _load_pdfs_meta()
+    try:
+        store = VectorStore()
+        report["total_points"] = store.count()
+        report["pdfs"] = [
+            {"id": p["id"], "name": p.get("name"), "points": store.count_pdf(p["id"])}
+            for p in pdfs
+        ]
+    except Exception as exc:  # never break the status call
+        report["error"] = str(exc)
+    return report
+
+
+@app.post("/storage/enforce", tags=["System"])
+def storage_enforce():
+    """Manually run the memory guard (evict oldest PDFs if over the high-water mark)."""
+    from indexing.storage_guard import enforce_memory_budget
+    return enforce_memory_budget()
+
+
 @app.post("/upload", response_model=PDFMeta, tags=["PDFs"])
 async def upload_pdf(file: UploadFile = File(...)):
     """
@@ -155,7 +191,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     The pipeline steps are:
     1. Save the PDF to data/
     2. Run ETL (pdfplumber extraction + cleaning)
-    3. Run indexing (chunking → embeddings → Chroma vector store)
+    3. Run indexing (chunking → embeddings → Qdrant vector store)
     """
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
@@ -182,8 +218,8 @@ async def upload_pdf(file: UploadFile = File(...)):
     # Run Indexing
     try:
         from indexing.run_indexing import run as run_indexing
-        run_indexing(str(DATA_DIR))
-        logger.info("Indexing complete for %s", safe_name)
+        run_indexing(str(DATA_DIR), pdf_id=pdf_id)
+        logger.info("Indexing complete for %s (pdf_id=%s)", safe_name, pdf_id)
     except Exception as exc:
         logger.exception("Indexing failed for %s", safe_name)
         raise HTTPException(status_code=500, detail=f"Indexing failed: {exc}")
@@ -198,6 +234,16 @@ async def upload_pdf(file: UploadFile = File(...)):
     existing = _load_pdfs_meta()
     existing.append(meta_entry)
     _save_pdfs_meta(existing)
+
+    # Free-tier safety valve: if the new data pushed Qdrant memory near the 1 GB
+    # limit, evict the oldest PDF(s). Never fatal to the upload.
+    try:
+        from indexing.storage_guard import enforce_memory_budget
+        guard = enforce_memory_budget()
+        if guard.get("evicted"):
+            logger.warning("Storage guard evicted: %s", guard["evicted"])
+    except Exception:
+        logger.exception("Storage guard failed (non-fatal)")
 
     return meta_entry
 
@@ -215,7 +261,7 @@ def query_agent(request: QueryRequest):
     """
     logger.info("POST /query  query=%r  pdf_id=%r", request.query, request.pdf_id)
     try:
-        result = run_query(request.query)
+        result = run_query(request.query, pdf_id=request.pdf_id)
     except Exception as exc:
         logger.exception("Unhandled error in run_query")
         raise HTTPException(status_code=500, detail=str(exc))

@@ -88,7 +88,7 @@ def run(query: str) -> None:
     print(c(DIM, "  " + "─" * (width - 4)))
 
     # ── Pipeline status ────────────────────────────────────────────────────────
-    print(f"\n  {c(GREEN, '✔')} Vector store loaded    {c(DIM, '(ChromaDB · 87 chunks)')}")
+    print(f"\n  {c(GREEN, '✔')} Vector store loaded    {c(DIM, '(Qdrant · 87 chunks)')}")
     print(f"  {c(GREEN, '✔')} Embedder ready         {c(DIM, '(all-MiniLM-L6-v2)')}")
     print(f"  {c(GREEN, '✔')} Tools available        {c(DIM, '(SemanticSearch · TableQuery · MathTool)')}")
     print(f"  {c(YELLOW, '▶')} Agent reasoning        {c(DIM, '(ReAct · OpenRouter · gpt-4o-mini)')}")

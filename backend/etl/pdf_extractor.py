@@ -12,6 +12,8 @@ pdfplumber / camelot internals.
 from __future__ import annotations
 
 import logging
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
@@ -47,15 +49,37 @@ class TableData:
 # Extraction helpers
 # ---------------------------------------------------------------------------
 
-def _extract_text(pdf_path: Path) -> List[PageText]:
-    """Use pdfplumber to extract text from every page."""
+def _extract_text_and_table_pages(
+    pdf_path: Path,
+) -> tuple[List[PageText], List[int]]:
+    """
+    Single pdfplumber pass that extracts text from every page AND cheaply
+    detects which pages contain table structures.
+
+    Detecting candidate pages here (pdfplumber's geometry-based ``find_tables``
+    is fast and runs no subprocess) lets us restrict the *expensive* camelot
+    extraction to pages that actually have tables — instead of invoking camelot
+    on every page (and falling back lattice→stream on every page), which on a
+    several-hundred-page document means well over a thousand full-PDF reparses
+    and Ghostscript launches.
+    """
     results: List[PageText] = []
+    table_pages: List[int] = []
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             raw = page.extract_text() or ""
             results.append(PageText(page_num=page.page_number, text=raw))
-    logger.info("Extracted text from %d pages", len(results))
-    return results
+            try:
+                if page.find_tables():
+                    table_pages.append(page.page_number)
+            except Exception as exc:  # detection must never abort extraction
+                logger.debug("Page %d table-detection failed: %s", page.page_number, exc)
+    logger.info(
+        "Extracted text from %d pages; %d page(s) have candidate tables",
+        len(results),
+        len(table_pages),
+    )
+    return results, table_pages
 
 
 def _extract_tables_from_page(
@@ -117,17 +141,42 @@ def extract_pdf(pdf_path: str | Path) -> tuple[List[PageText], List[TableData]]:
 
     logger.info("Starting extraction: %s", pdf_path)
 
-    page_texts = _extract_text(pdf_path)
+    page_texts, table_pages = _extract_text_and_table_pages(pdf_path)
+    total_pages = len(page_texts)
+
+    # Camelot calls are independent and dominated by a Ghostscript subprocess
+    # (which releases the GIL), so running candidate pages through a thread pool
+    # gives a near-linear speedup. Worker count is capped to keep peak memory
+    # sane and is overridable via ETL_TABLE_WORKERS.
+    max_workers = min(
+        int(os.getenv("ETL_TABLE_WORKERS", "4")),
+        max(1, len(table_pages)),
+    )
 
     all_tables: List[TableData] = []
-    total_pages = len(page_texts)
-    for page_num in range(1, total_pages + 1):
-        tables = _extract_tables_from_page(pdf_path, page_num)
-        all_tables.extend(tables)
+    if table_pages:
+        done = 0
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {
+                pool.submit(_extract_tables_from_page, pdf_path, pn): pn
+                for pn in table_pages
+            }
+            for fut in as_completed(futures):
+                done += 1
+                page_num = futures[fut]
+                try:
+                    all_tables.extend(fut.result())
+                except Exception as exc:
+                    logger.warning("Table parse failed on page %d: %s", page_num, exc)
+                logger.info("Parsed tables %d/%d candidate pages", done, len(table_pages))
+        # Restore deterministic ordering (thread completion order is arbitrary).
+        all_tables.sort(key=lambda t: (t.page_num, t.table_index))
 
     logger.info(
-        "Extraction complete – %d pages, %d tables",
+        "Extraction complete – %d pages, %d tables (from %d candidate page(s), %d workers)",
         total_pages,
         len(all_tables),
+        len(table_pages),
+        max_workers,
     )
     return page_texts, all_tables

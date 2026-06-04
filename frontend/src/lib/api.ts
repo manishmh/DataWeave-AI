@@ -1,13 +1,18 @@
 import axios from 'axios';
 
-// FastAPI default port
-const API_BASE_URL = 'http://localhost:8000';
+// Backend base URL. In production (Vercel) set NEXT_PUBLIC_API_URL to the
+// deployed backend, e.g. https://your-space.hf.space — falls back to the
+// local FastAPI dev server otherwise. (NEXT_PUBLIC_ vars are inlined at build
+// time and exposed to the browser, which is correct here.)
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:8000';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // NOTE: we deliberately do NOT set a global 'Content-Type' here.
+  // Axios infers 'application/json' for plain-object bodies and the correct
+  // 'multipart/form-data; boundary=...' for FormData. Hard-coding the header
+  // strips the multipart boundary and breaks file uploads (FastAPI 422).
 });
 
 export interface PDFMeta {
@@ -43,9 +48,7 @@ export const api = {
     formData.append('file', file);
 
     const response = await apiClient.post<PDFMeta>('/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      // Let the browser set 'multipart/form-data' with the correct boundary.
       onUploadProgress: (progressEvent) => {
         if (progressEvent.total && onProgress) {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -69,5 +72,15 @@ export const api = {
       pdf_id: pdfId,
     });
     return response.data;
+  },
+
+  // Lightweight liveness probe for the backend-status indicator.
+  health: async (): Promise<boolean> => {
+    try {
+      const response = await apiClient.get('/health', { timeout: 4000 });
+      return response.status === 200;
+    } catch {
+      return false;
+    }
   },
 };

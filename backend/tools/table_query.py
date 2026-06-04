@@ -106,7 +106,7 @@ table_query_tool = Tool(
     name="TableQuery",
     func=_table_query,
     description=(
-        "Query structured tables extracted from the Cyber Ireland 2022 Report. "
+        "Query structured tables extracted from the uploaded document. "
         "Input must be a JSON string with keys: "
         "'page' (int, required), "
         "'table_index' (int, optional, default 0), "
