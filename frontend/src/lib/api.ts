@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { createClient } from '@/lib/supabase/client';
 
 // Backend base URL. In production (Vercel) set NEXT_PUBLIC_API_URL to the
 // deployed backend, e.g. https://your-space.hf.space — falls back to the
@@ -13,6 +14,20 @@ export const apiClient = axios.create({
   // Axios infers 'application/json' for plain-object bodies and the correct
   // 'multipart/form-data; boundary=...' for FormData. Hard-coding the header
   // strips the multipart boundary and breaks file uploads (FastAPI 422).
+});
+
+// Attach the current Supabase access token so the backend can verify the user
+// (protected routes: /query, /upload, /pdfs, /storage). No-op when logged out.
+const _supabase = createClient();
+apiClient.interceptors.request.use(async (config) => {
+  try {
+    const { data } = await _supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+  } catch {
+    /* not signed in / storage unavailable — send unauthenticated */
+  }
+  return config;
 });
 
 export interface PDFMeta {

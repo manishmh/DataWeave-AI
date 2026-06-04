@@ -42,6 +42,8 @@ pydantic>=2.7.0
 # Required by FastAPI to parse multipart/form-data (the /upload file endpoint).
 # Not pulled in automatically by `fastapi`, so it must be listed explicitly.
 python-multipart>=0.0.9
+# Verifies the Supabase access token (HS256) on protected routes.
+pyjwt>=2.8.0
 
 # Logging
 structlog>=24.1.0

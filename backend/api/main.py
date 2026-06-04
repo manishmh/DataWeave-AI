@@ -35,8 +35,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+import os
+
+import jwt
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from agent.react_agent import run_query
@@ -142,6 +146,43 @@ class PDFMeta(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Auth — verify the Supabase access token (HS256, signed with the project's
+# JWT secret). The frontend sends it as `Authorization: Bearer <token>`.
+#
+# Set SUPABASE_JWT_SECRET (Supabase → Settings → API → JWT Secret) to ENFORCE
+# auth. If it's unset, verification is skipped (fail-open) so the service still
+# boots before the secret is configured — a warning is logged in that case.
+# ---------------------------------------------------------------------------
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+_bearer = HTTPBearer(auto_error=False)
+
+if not SUPABASE_JWT_SECRET:
+    logger.warning(
+        "SUPABASE_JWT_SECRET is not set — backend routes are UNAUTHENTICATED. "
+        "Set it to require a valid login on /query, /upload, etc."
+    )
+
+
+def require_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> dict | None:
+    """FastAPI dependency: 401 unless a valid Supabase JWT is presented."""
+    if not SUPABASE_JWT_SECRET:
+        return None  # enforcement disabled until the secret is configured
+    if creds is None:
+        raise HTTPException(status_code=401, detail="Missing authentication token.")
+    try:
+        return jwt.decode(
+            creds.credentials,
+            SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            audience="authenticated",
+        )
+    except jwt.PyJWTError as exc:
+        raise HTTPException(status_code=401, detail=f"Invalid or expired token: {exc}")
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
@@ -151,13 +192,13 @@ def health_check():
 
 
 @app.get("/pdfs", response_model=list[PDFMeta], tags=["PDFs"])
-def list_pdfs():
+def list_pdfs(_user: dict | None = Depends(require_user)):
     """Return metadata for all uploaded PDFs."""
     return _load_pdfs_meta()
 
 
 @app.get("/storage", tags=["System"])
-def storage_status():
+def storage_status(_user: dict | None = Depends(require_user)):
     """Current Qdrant memory usage vs the free-tier limit (per-PDF breakdown)."""
     from indexing.storage_guard import memory_report
     from indexing.vector_store import VectorStore
@@ -177,14 +218,14 @@ def storage_status():
 
 
 @app.post("/storage/enforce", tags=["System"])
-def storage_enforce():
+def storage_enforce(_user: dict | None = Depends(require_user)):
     """Manually run the memory guard (evict oldest PDFs if over the high-water mark)."""
     from indexing.storage_guard import enforce_memory_budget
     return enforce_memory_budget()
 
 
 @app.post("/upload", response_model=PDFMeta, tags=["PDFs"])
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(file: UploadFile = File(...), _user: dict | None = Depends(require_user)):
     """
     Upload a PDF, run ETL + indexing pipeline, and return metadata.
 
@@ -249,7 +290,7 @@ async def upload_pdf(file: UploadFile = File(...)):
 
 
 @app.post("/query", response_model=QueryResponse, tags=["Agent"])
-def query_agent(request: QueryRequest):
+def query_agent(request: QueryRequest, _user: dict | None = Depends(require_user)):
     """
     Submit a natural-language question about an uploaded PDF.
 
